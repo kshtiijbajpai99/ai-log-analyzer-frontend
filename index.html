@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Log Security Analyzer</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #0f172a;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    transition: 0.3s;
+}
+
+h1 { color: #38bdf8; }
+
+.container {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.panel {
+    flex: 1;
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+textarea {
+    width: 100%;
+    height: 150px;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+button {
+    background: #38bdf8;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+.summary-box {
+    background: #0f172a;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: left;
+}
+
+.risk-low { color: green; }
+.risk-medium { color: orange; }
+.risk-high { color: red; }
+.risk-critical { color: darkred; }
+
+ul {
+    text-align: left;
+}
+
+/* 🔥 Log Viewer */
+.log-box {
+    background: black;
+    padding: 10px;
+    border-radius: 5px;
+    max-height: 300px;
+    overflow-y: auto;
+    text-align: left;
+}
+
+.log-line {
+    padding: 4px;
+}
+
+.line-number {
+    color: gray;
+    margin-right: 10px;
+}
+
+/* 🔥 Risk Highlights */
+.line-low { background: #064e3b; }
+.line-medium { background: #78350f; }
+.line-high { background: #7f1d1d; }
+.line-critical { background: #450a0a; color: white; }
+
+/* 🌞 LIGHT MODE */
+body.light {
+    background: #f1f5f9;
+    color: black;
+}
+
+.light .panel {
+    background: white;
+}
+
+.light .log-box {
+    background: #e2e8f0;
+}
+
+.light .summary-box {
+    background: #e2e8f0;
+}
+
+/* 🔘 Toggle Button */
+#themeToggle {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 20px;
+    padding: 8px 12px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🔐 AI Log Security Analyzer</h1>
+<button id="themeToggle">🌙</button>
+
+<div class="container">
+
+<div class="panel">
+    <h3>📂 Upload Log File</h3>
+    <input type="file" id="fileInput">
+
+    <h3>📋 OR Paste Logs</h3>
+    <textarea id="textInput" placeholder="Paste logs here..."></textarea>
+
+    <button onclick="analyze()">🚀 Analyze</button>
+</div>
+
+<div class="panel">
+    <h3>📊 Results</h3>
+    <div id="result">No analysis yet</div>
+</div>
+
+</div>
+
+<script>
+
+// 🌙 Theme Toggle
+const toggleBtn = document.getElementById("themeToggle");
+
+// Load saved theme
+if (localStorage.getItem("theme") === "light") {
+    document.body.classList.add("light");
+    toggleBtn.textContent = "🌞";
+}
+
+toggleBtn.addEventListener("click", () => {
+    document.body.classList.toggle("light");
+
+    const isLight = document.body.classList.contains("light");
+    toggleBtn.textContent = isLight ? "🌞" : "🌙";
+
+    localStorage.setItem("theme", isLight ? "light" : "dark");
+});
+
+
+// 🔍 Analyze Function
+async function analyze() {
+    const fileInput = document.getElementById("fileInput");
+    const textInput = document.getElementById("textInput").value.trim();
+    const resultBox = document.getElementById("result");
+
+    resultBox.innerHTML = "⏳ Analyzing...";
+
+    try {
+        let response;
+
+        if (fileInput.files.length > 0) {
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            response = await fetch("http://localhost:5000/analyze", {
+                method: "POST",
+                body: formData
+            });
+        } 
+        else if (textInput !== "") {
+            response = await fetch("http://localhost:5000/analyze", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: textInput })
+            });
+        } 
+        else {
+            resultBox.innerHTML = "❌ Please provide input";
+            return;
+        }
+
+        if (!response.ok) throw new Error("Server error");
+
+        const data = await response.json();
+
+        if (!data.success) {
+            resultBox.innerHTML = "❌ Backend error";
+            return;
+        }
+
+        displayResult(data.data);
+
+    } catch (err) {
+        console.error(err);
+        resultBox.innerHTML = "❌ Error connecting to backend";
+    }
+}
+
+
+// 📊 Display Results
+function displayResult(data) {
+    const risk = data.risk_level;
+
+    let riskClass = "risk-low";
+    if (risk === "Medium") riskClass = "risk-medium";
+    if (risk === "High") riskClass = "risk-high";
+    if (risk === "Critical") riskClass = "risk-critical";
+
+    const findingsMap = {};
+    data.findings.forEach(f => {
+        findingsMap[f.line] = f.risk;
+    });
+
+    const highlightedLogs = data.maskedLogs.map((line, index) => {
+        const lineNumber = index + 1;
+        let className = "";
+
+        if (findingsMap[lineNumber]) {
+            className = "line-" + findingsMap[lineNumber];
+        }
+
+        return `
+            <div class="log-line ${className}">
+                <span class="line-number">${lineNumber}</span>
+                ${line}
+            </div>
+        `;
+    }).join("");
+
+    const low = data.findings.filter(f => f.risk === "low").length;
+    const medium = data.findings.filter(f => f.risk === "medium").length;
+    const high = data.findings.filter(f => f.risk === "high").length;
+    const critical = data.findings.filter(f => f.risk === "critical").length;
+
+    document.getElementById("result").innerHTML = `
+        <div class="summary-box">
+            <h3>🚨 Threat Summary</h3>
+            <p>🔥 Risk Level: <span class="${riskClass}">${risk}</span></p>
+            <p>📊 Risk Score: ${data.risk_score}</p>
+            <p>🛡️ Action: ${data.action}</p>
+            <p>⏱️ Time: ${data.analysis_time} ms</p>
+            <p>📈 Requests: ${data.total_requests}</p>
+        </div>
+
+        <h3>🤖 AI Insights</h3>
+        <ul>
+            ${data.insights.map(i => `<li>${i}</li>`).join("")}
+        </ul>
+
+        <h3>🔍 Findings</h3>
+        <ul>
+            ${data.findings.map(f => `
+                <li>${f.type} | ${f.risk} | line ${f.line}</li>
+            `).join("")}
+        </ul>
+
+        <h3>📊 Risk Breakdown</h3>
+        <ul>
+            <li>Low: ${low}</li>
+            <li>Medium: ${medium}</li>
+            <li>High: ${high}</li>
+            <li>Critical: ${critical}</li>
+        </ul>
+
+        <h3>📄 Highlighted Logs</h3>
+        <div class="log-box">
+            ${highlightedLogs}
+        </div>
+
+        <button onclick="downloadReport()">⬇️ Download Report</button>
+    `;
+}
+
+
+// 📥 Download Report
+function downloadReport() {
+    const content = document.getElementById("result").innerText;
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "report.txt";
+    a.click();
+}
+
+</script>
+
+</body>
+</html>
