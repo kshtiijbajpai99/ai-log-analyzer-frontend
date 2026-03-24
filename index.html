@@ -145,7 +145,6 @@ body.light {
 // 🌙 Theme Toggle
 const toggleBtn = document.getElementById("themeToggle");
 
-// Load saved theme
 if (localStorage.getItem("theme") === "light") {
     document.body.classList.add("light");
     toggleBtn.textContent = "🌞";
@@ -153,13 +152,10 @@ if (localStorage.getItem("theme") === "light") {
 
 toggleBtn.addEventListener("click", () => {
     document.body.classList.toggle("light");
-
     const isLight = document.body.classList.contains("light");
     toggleBtn.textContent = isLight ? "🌞" : "🌙";
-
     localStorage.setItem("theme", isLight ? "light" : "dark");
 });
-
 
 // 🔍 Analyze Function
 async function analyze() {
@@ -176,13 +172,13 @@ async function analyze() {
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
 
-            response = await fetch("http://localhost:5000/analyze", {
+            response = await fetch("https://ai-log-analyzer-backend-zbho.onrender.com/analyze", {
                 method: "POST",
                 body: formData
             });
         } 
         else if (textInput !== "") {
-            response = await fetch("http://localhost:5000/analyze", {
+            response = await fetch("https://ai-log-analyzer-backend-zbho.onrender.com/analyze", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content: textInput })
@@ -209,7 +205,6 @@ async function analyze() {
         resultBox.innerHTML = "❌ Error connecting to backend";
     }
 }
-
 
 // 📊 Display Results
 function displayResult(data) {
@@ -284,7 +279,6 @@ function displayResult(data) {
         <button onclick="downloadReport()">⬇️ Download Report</button>
     `;
 }
-
 
 // 📥 Download Report
 function downloadReport() {
